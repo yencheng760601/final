@@ -1,0 +1,261 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Untitled Document</title>
+    <script src="https://d3js.org/d3.v3.js"></script>
+    <style>
+        body {
+            background: #eee;
+        }
+        
+        .axis path,
+        .axis line {
+            fill: none;
+            stroke: black;
+            shape-rendering: auto;
+        }
+        
+        .axis text {
+            font-size: 11px;
+            fill: red;
+        }
+        
+        #tooltip {
+            position: absolute;
+            /*            位置可指定*/
+            left: 20px;
+            /*            左往右*/
+            top: 100px;
+            /*            上往下*/
+            background: #fff;
+            width: 150px;
+            height: auto;
+            padding: 0px 10px;
+            border-radius: 5px;
+            box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        #tooltip.hidden {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="tooltip" class="hidden">
+        <p><strong id="job">Hello</strong></p>
+        <p id="yy">tooltip</p>
+        <p id="amt">tooltip</p>
+    </div>
+    <script>
+       
+        // 1. 定義width, height, padding, letterList變數
+        var w = 900;
+        var h = 600;
+        var padding = 60;
+        var letterList = ["A","B","C","D","E","F","G","H","I","J","K","M","N","O","P","Q","T","U","V","W","X","Z"];
+        
+        //2. 建立svg()畫布環境        
+        svg();       
+        
+        //3. 用d3讀取csv
+        
+        var csv = d3.dsv(",", "text/csv;charset=UTF-8");
+        csv("convert4.csv", function(dataSet){
+           var f = d3.csv.format(dataSet);
+           var parseCSV = d3.csv.parseRows(f);
+           
+           var row = parseCSV[0];
+           var jobary = [];
+           for(var i=0;i<row.length;i++){
+               if(row[i]!=''){
+                   jobary[i] = row[i];
+               }
+           }
+
+           var ds = [];
+           var tmp,y,jobname,amt;
+      
+           for(var i=1;i<parseCSV.length;i++){
+               row = parseCSV[i];
+               y = row[0]; 
+               for(var j=1;j<row.length;j++){
+                   if(row[j]!=''){
+                       jobname = jobary[j];
+                       amt = row[j];
+                       tmp = { year:y, job:jobname, amount:amt };                       
+                   }
+                   ds.push(tmp);
+               }               
+           }
+                
+
+           bind(ds);
+           render(ds);
+           btnList(ds); 
+        });
+        
+        
+        function svg(){
+           d3.select("body").append("svg").attr({
+               width: w,
+               height: h
+           });
+            d3.select("svg").append("g").append("rect").attr({
+                width: "100%",
+                height: "100%",
+                fill: "white"
+            });
+            d3.select("svg").append("g").attr("id","axisX");
+            d3.select("svg").append("g").attr("id","axisY");
+        }
+        
+        //4. 建立bind()
+
+        function bind(dataSet){
+            var selection = d3.select("svg")
+                                .selectAll("circle")
+                                .data(dataSet);
+            
+            selection.enter().append("circle");
+            selection.exit().remove();
+        }
+        
+        function render(dataSet){
+            //5. 定義xScale,yScale,rScale, fScale比例尺(range目的在決定在svg上位置)
+
+           var xScale = d3.scale.linear()
+                    .domain([
+                      d3.min(dataSet,function(d){
+                          return +d.year;
+                      }),
+                      d3.max(dataSet,function(d){
+                          return +d.year;
+                      })
+                    ])
+                    .range([padding,w-padding]);
+           var yScale = d3.scale.linear()
+                    .domain([0,d3.max(dataSet,function(d){
+                        return +d.amount;
+                    })])
+                    .range([h-padding, padding]);
+           var rScale = d3.scale.linear()
+                    .domain([
+                        d3.min(dataSet,function(d){
+                            return +d.amount;
+                        }),
+                        d3.max(dataSet,function(d){
+                            return +d.amount;
+                        })
+                    ])
+                    .range([5,30]);
+           var fScale = d3.scale.category20();
+           var xAxis = d3.svg.axis()
+                             .scale(xScale)
+                             .orient("bottom")
+                             .ticks(10);
+           //d3.select("svg").append("g")
+           d3.select("g#axisX")
+                           .attr("class","axis")
+                           .attr("transform","translate(0,"+(h-padding+15)+")")
+                           .call(xAxis);
+           var yAxis = d3.svg.axis()
+                             .scale(yScale)
+                             .orient("left")
+                        //     .ticks(5); 
+           //d3.select("svg").append("g")
+           d3.select("g#axisY")
+                           .attr("class","axis")
+                           .attr("transform","translate("+(padding-12)+",0)")
+                           .call(yAxis);
+            
+           
+            
+            //6. 建立render()繪圖
+            d3.selectAll("circle")
+              .attr({
+                cx: function(d){
+                    //var tmpDate = new Date(d.date);
+                    return xScale(+d.year);
+                },
+                cy: function(d){
+                    return yScale(+d.amount);
+                },
+                r: function(d){
+                    return rScale(+d.amount);
+                },
+                fill: function(d){
+                    return fScale(d.job);
+                }
+              })
+              .on("mouseover", function(d){
+                                  var cor = d3.mouse(this);
+                                  var x = cor[0];
+                                  var y = cor[1];
+                                  var tooltip = d3.select("#tooltip").transition().duration(1000).ease("elastic")
+                                                  .style({
+                                                      left: (x+10)+"px", 
+                                                      top: (y+10)+"px"
+                                                  });
+                                  tooltip.select("#job").text(d.job);
+                                  tooltip.select("#yy").text(d.year+"年度");
+                                  tooltip.select("#amt").text(d.amount+"元");
+                                  d3.select("#tooltip").classed("hidden",false);
+              })
+              .on("mouseout", function(d){
+                                  d3.select("#tooltip").classed("hidden",true);
+              });
+        }
+        
+        function btnList(dataSet){
+            var jobArr = dataSet.map(function(d){
+                                   return d.job;
+                                 });
+            var uniqueCityArr = unique(jobArr);
+            
+            var selection = d3.select("body").append("div")
+                                             .selectAll("input")
+                                             .data(uniqueCityArr);                             
+            selection.enter().append("input")
+                             .attr({
+                                type: "button",
+                                value: function(d){
+                                         return d;
+                                       }
+                             })
+                             .on("click",function(d){
+                                           update(d);
+                                         });
+            selection.exit().remove();
+            
+            //為了要使用dataSet,必須寫在btnList function裡面
+            function update(jobName){
+              var newDataSet = dataSet.filter(function(d){
+                                                return d.job===jobName;
+                                             });
+              bind(newDataSet);
+              render(newDataSet);
+            }
+        }
+        
+        function unique(array){
+          var n = []; 
+  
+          //去看每個array，如果沒出現過就加到n中      
+          for(var i=0; i<array.length; i++){
+            if(n.indexOf(array[i])===-1){
+              n.push(array[i]);
+            }
+          }
+          return n;
+        }
+    
+    </script>
+
+
+
+</body>
+
+</html>
